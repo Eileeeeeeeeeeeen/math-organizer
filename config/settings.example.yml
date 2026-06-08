@@ -1,0 +1,42 @@
+# 考研数学题目智能整理 Agent — 配置文件模板
+# ==========================================
+# 复制此文件为 settings.yml 并填入你的 API keys:
+#   cp config/settings.example.yml config/settings.yml
+
+# ── OCR 配置 ──
+ocr:
+  provider: paddleocr_vl
+  api_endpoint: "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
+  api_key: "your-paddleocr-api-key-here"
+  model: "PaddleOCR-VL-1.6"
+  output_format: markdown
+  timeout: 30
+
+# ── LLM 配置 ──
+llm:
+  provider: deepseek
+  api_base: "https://api.deepseek.com/v1"
+  api_key: "your-deepseek-api-key-here"
+  model_default: deepseek-v4-pro
+  model_complex: deepseek-v4-pro          # 复杂题（解答/证明）
+  reasoning_effort: medium                # low | medium | high | max
+  max_retries: 2
+  temperature: 0.1                        # 低温度保证输出一致性
+
+# ── 路径配置 ──
+paths:
+  vault_root: "./考研数学题库"
+  assets_dir: "assets/images"
+  config_dir: "config"
+
+# ── 流水线配置 ──
+pipeline:
+  max_concurrency: 5      # 最大并发LLM请求数 (1-8)
+  auto_mode: false        # 全自动模式：OCR完成后自动进行LLM整理，跳过等待
+
+# ── GUI 配置 ──
+gui:
+  title: "📐 考研数学题目整理 Agent"
+  port: 7880
+  theme: soft
+  host: "0.0.0.0"

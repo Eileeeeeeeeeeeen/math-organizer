@@ -1,0 +1,52 @@
+---
+subject: {{ meta.subject }}
+lecture: {{ meta.lecture }}
+question_type: {{ meta.question_type }}
+opd_target: {{ meta.opd.target }}
+opd_procedures:
+{% for p in meta.opd.procedures %}  - {{ p }}
+{% endfor %}opd_details:
+{% for d in meta.opd.details %}  - {{ d }}
+{% endfor %}key_ability:
+{% for a in meta.key_ability %}  - {{ a }}
+{% endfor %}source_book: {{ meta.source.book }}
+source_example: {{ meta.source.example_id }}
+source_year: "{{ meta.source.year }}"
+tags:
+{% for t in meta.tags %}  - {{ t }}
+{% endfor %}summary: {{ summary }}
+created: {{ created }}
+updated: {{ updated }}
+---
+
+# 📐 {{ title }}
+
+## ❓ 题目
+
+{{ problem }}
+
+## ✅ 答案
+
+{{ answer }}
+
+## 📝 解题思路
+
+{{ solution.approach }}
+
+## 🔑 解题关键
+
+{{ solution.key_insight }}
+
+## 🔍 解题过程
+
+{% for step in solution.steps %}{{ loop.index }}. {{ step }}
+{% endfor %}
+## 🔗 相关知识点
+
+{% for kp in related.knowledge_points %}- [[{{ kp }}]]
+{% endfor %}
+{% if related.linked_examples %}
+## 📎 关联题目
+
+{% for ex in related.linked_examples %}- [[{{ ex }}]]
+{% endfor %}{% endif %}

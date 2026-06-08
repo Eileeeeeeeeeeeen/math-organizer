@@ -1,0 +1,30 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git
+.git/
+.gitignore
+
+# Claude Code
+.claude/
+
+# Config (mounted at runtime, contains API keys)
+config/
+
+# Vault (mounted at runtime, user data)
+考研数学题库/
+
+# Legacy
+.pids/
+tests/api.md
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml

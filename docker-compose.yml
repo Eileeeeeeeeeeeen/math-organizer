@@ -1,0 +1,21 @@
+# Math Organizer — Docker Compose
+# 启动: HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose up -d
+# 或使用 ./docker-start.sh
+
+services:
+  math-organizer:
+    build: .
+    image: math-organizer:latest
+    container_name: math-organizer
+    ports:
+      - "7880:7880"
+    volumes:
+      # API keys + settings — 只读，防止意外修改
+      - ./config:/app/config:ro
+      # Vault 输出目录 — 需读写
+      - ./考研数学题库:/app/考研数学题库
+    environment:
+      - PYTHONPATH=/app
+    # 以宿主机用户身份运行，避免 root 写文件后权限问题
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    restart: unless-stopped

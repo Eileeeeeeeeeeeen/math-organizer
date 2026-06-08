@@ -1,0 +1,32 @@
+.pids/
+tests/api.md
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+*.pyc
+
+# API keys (real keys — do NOT commit)
+config/settings.yml
+
+# User data (generated vault output)
+考研数学题库/
+
+# Self-use backup (contains pre-debrand content, do NOT commit)
+self-use-backup/
+
+# Internal planning docs (filename starts with #)
+[#] 考研数学题目智能整理 Agent —— 最终项目规划.md
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

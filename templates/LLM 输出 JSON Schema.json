@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["meta", "problem", "answer", "solution"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["subject", "lecture", "question_type"],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "enum": ["高等数学", "线性代数", "概率统计"]
+        },
+        "lecture": {
+          "type": "string",
+          "description": "对应知识体系的讲次，如'第1讲_函数极限与连续'"
+        },
+        "question_type": {
+          "type": "string",
+          "enum": ["选择题", "填空题", "解答题"]
+        },
+        "source": {
+          "type": "object",
+          "description": "题目来源",
+          "properties": {
+            "book": {"type": "string"},
+            "year": {"type": "string"},
+            "page": {"type": "string"},
+            "example_id": {"type": "string"}
+          }
+        },
+        "opd": {
+          "type": "object",
+          "description": "解题方法论标注",
+          "properties": {
+            "target": {"type": "string", "description": "O_开头的目标代码"},
+            "procedures": {"type": "array", "items": {"type": "string"}, "description": "P_开头的思路代码"},
+            "details": {"type": "array", "items": {"type": "string"}, "description": "D_开头的细节代码"}
+          }
+        },
+        "key_ability": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["概念辨析", "计算能力", "证明推理", "综合应用"]}
+        },
+        "tags": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "problem": {
+      "type": "string",
+      "description": "题目原文，数学公式用LaTeX格式"
+    },
+    "answer": {
+      "type": "string",
+      "description": "最终答案，数学公式用LaTeX格式"
+    },
+    "solution": {
+      "type": "object",
+      "properties": {
+        "approach": {
+          "type": "string",
+          "description": "解题核心思路（≤200字）"
+        },
+        "key_insight": {
+          "type": "string",
+          "description": "解题关键——直截了当指出该题的核心关键点（≤80字），如：'极限转化为导数定义'、'利用对称性消去交叉项'"
+        },
+        "steps": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "详细解题步骤，每步一个元素，数学公式用LaTeX"
+        }
+      },
+      "required": ["approach", "key_insight", "steps"]
+    },
+    "related": {
+      "type": "object",
+      "properties": {
+        "knowledge_points": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "涉及的知识点名称"
+        },
+        "linked_examples": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "相关例题引用"
+        }
+      }
+    }
+  }
+}

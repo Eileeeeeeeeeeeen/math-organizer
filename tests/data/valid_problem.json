@@ -1,0 +1,35 @@
+{
+    "meta": {
+        "subject": "高等数学",
+        "lecture": "第1讲_函数极限与连续",
+        "question_type": "解答题",
+        "source": {
+            "book": "考研数学基础教程",
+            "year": "2026",
+            "page": "15",
+            "example_id": "例1.5"
+        },
+        "opd": {
+            "target": "O_极限",
+            "procedures": ["P11_正向思路"],
+            "details": ["D22_转换等价表述", "D41_利用已知结论"]
+        },
+        "key_ability": ["计算能力", "证明推理"],
+        "tags": ["函数极限", "等价无穷小"]
+    },
+    "problem": "求极限 $\\lim_{x \\to 0} \\frac{\\sin 3x - \\tan 2x}{x}$。",
+    "answer": "$\\lim_{x \\to 0} \\frac{\\sin 3x - \\tan 2x}{x} = 1$。",
+    "solution": {
+        "approach": "利用等价无穷小替换，将 sin(3x) 替换为 3x，将 tan(2x) 替换为 2x，然后直接计算极限。",
+        "key_insight": "识别分子中各项的同阶无穷小，正确使用等价无穷小替换公式",
+        "steps": [
+            "当 $x \\to 0$ 时，$\\sin 3x \\sim 3x$，$\\tan 2x \\sim 2x$。",
+            "代入极限表达式：$\\lim_{x \\to 0} \\frac{\\sin 3x - \\tan 2x}{x} = \\lim_{x \\to 0} \\frac{3x - 2x}{x}$。",
+            "$= \\lim_{x \\to 0} \\frac{x}{x} = 1$。"
+        ]
+    },
+    "related": {
+        "knowledge_points": ["无穷小量的比较（等价无穷小替换）", "极限的四则运算法则"],
+        "linked_examples": ["例1.2", "例1.8"]
+    }
+}
