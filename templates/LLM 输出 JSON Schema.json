@@ -68,6 +68,10 @@
           "type": "array",
           "items": {"type": "string"},
           "description": "详细解题步骤，每步一个元素，数学公式用LaTeX"
+        },
+        "error_analysis": {
+          "type": "string",
+          "description": "错因分析——若题目文本中提供了用户错因，分析其错误根源、正确思路对比、避错策略；若未提供错因则留空字符串"
         }
       },
       "required": ["approach", "key_insight", "steps"]

@@ -336,7 +336,14 @@ class Pipeline:
 
             ocr_text = "\n\n---\n\n".join(parts)
             if item.user_notes:
-                ocr_text = f"{ocr_text}\n\n📝 补充信息：{item.user_notes}"
+                ocr_text = (
+                    f"{ocr_text}\n\n---\n"
+                    f"用户附加信息：{item.user_notes}\n"
+                    f"---\n"
+                    f"请根据以上附加信息调整整理结果。若附加信息包含错因，"
+                    f"务必在 solution.error_analysis 中详细分析错误根源、"
+                    f"对比正确思路、并给出避错策略。"
+                )
             item.ocr_text = ocr_text
             item.status = QueueStatus.OCR_DONE
 
@@ -667,7 +674,12 @@ def _build_system_prompt(knowledge_tree: str, opd_markers: str) -> str:
 6. OPD 标记只能从上述记号体系中选择
 7. key_ability 从 [概念辨析, 计算能力, 证明推理, 综合应用] 中选择
 8. solution.key_insight 直截了当指出该题的核心关键（如"极限转化为导数定义""利用对称性消去交叉项""构造辅助函数应用罗尔定理"）
-9. 解题步骤清晰，每步一个字符串元素"""
+9. 解题步骤清晰，每步一个字符串元素
+10. solution.error_analysis：若用户提供了错因信息，必须详细分析：
+    - 错误根源：用户为何出错（概念混淆？计算失误？方法选错？）
+    - 正确思路对比：用户的错误思路 vs 正确的解题路径
+    - 避错策略：下次遇到同类题该如何规避此错误
+    若用户未提供错因，error_analysis 留空字符串"""
 
 
 def _get_api_key(env_var: str, settings: Optional[Settings] = None) -> str:

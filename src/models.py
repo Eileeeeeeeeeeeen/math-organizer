@@ -108,6 +108,10 @@ class Solution(BaseModel):
         default_factory=list,
         description="详细解题步骤，每步一个元素",
     )
+    error_analysis: str = Field(
+        default="",
+        description="错因分析——LLM 结合用户提供的错误原因，分析错误根源、正确思路对比、避错策略",
+    )
 
 
 class Related(BaseModel):

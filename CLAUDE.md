@@ -226,6 +226,11 @@ PyInstaller 打包为独立 .exe。需先改造 `__file__` 路径为 `get_bundle
 - 外部 API: PaddleOCR VL-1.6, DeepSeek v4-pro
 - 端口: 7880
 
+## Git Commit 署名
+
+所有 git commit message 末尾使用：
+Co-Authored-By: DeepSeek v4-pro <noreply@deepseek.com>
+
 ## Memory Files
 
 项目记忆存储在 `/home/eileen/.claude/projects/-home-eileen-DockerFiles-math-organizer/memory/`:

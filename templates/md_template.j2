@@ -36,7 +36,11 @@ updated: {{ updated }}
 ## 🔑 解题关键
 
 {{ solution.key_insight }}
+{% if solution.error_analysis %}
+## ⚠️ 错因分析
 
+{{ solution.error_analysis }}
+{% endif %}
 ## 🔍 解题过程
 
 {% for step in solution.steps %}{{ loop.index }}. {{ step }}

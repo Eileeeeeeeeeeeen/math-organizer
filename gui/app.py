@@ -630,8 +630,8 @@ def create_app() -> gr.Blocks:
                         page_selector = gr.Textbox(visible="hidden", elem_id="page_selector")
 
                         manual_notes = gr.Textbox(
-                            label="📝 附加信息（添加到每题）",
-                            placeholder="可添加题目来源、章节等备注...",
+                            label="📝 附加信息（添加到每题，含错因分析、题目来源、备注等）",
+                            placeholder="例如：我把条件概率和联合概率搞混了 / 此题来自2024真题 / 注意区分拉格朗日和柯西中值定理...",
                             lines=2,
                         )
                         # Hidden textbox for JS-driven clipboard paste (Ctrl+V)
