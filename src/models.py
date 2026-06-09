@@ -3,37 +3,71 @@
 These models serve as the single source of truth for all data validation.
 They mirror the JSON Schema defined in template/LLM 输出 JSON Schema.json
 and the YAML frontmatter spec from the planning document.
+
+All subject-specific enums (Subject, QuestionType, KeyAbility) have been
+replaced by config-driven strings from config/subject.yml.  See
+SubjectConfig for the centralized configuration.
 """
 
 from __future__ import annotations
 
 from datetime import date
-from enum import Enum
+from enum import Enum as _Enum
 from typing import Annotated, Optional
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 
-# ── Enums ────────────────────────────────────────────────────────────────────
+# ── Subject Configuration (replaces hard-coded enums) ──────────────────────────
 
 
-class Subject(str, Enum):
-    GAO_SHU = "高等数学"
-    XIAN_DAI = "线性代数"
-    GAI_LV = "概率统计"
+class OPDConfig(BaseModel):
+    """OPD (解题方法论) configuration — can be disabled per subject."""
+    enabled: bool = True
+    label: str = "解题方法论（OPD）"
+    config_file: str = "opd_markers.yml"
 
 
-class QuestionType(str, Enum):
-    XUAN_ZE = "选择题"
-    TIAN_KONG = "填空题"
-    JIE_DA = "解答题"
+class KnowledgeTreeConfig(BaseModel):
+    """Knowledge tree file reference."""
+    file: str = "knowledge_tree.yml"
+    label: str = "知识体系"
 
 
-class KeyAbility(str, Enum):
-    CONCEPT = "概念辨析"
-    CALCULATION = "计算能力"
-    PROOF = "证明推理"
-    COMPREHENSIVE = "综合应用"
+class SubjectConfig(BaseModel):
+    """Central subject configuration loaded from config/subject.yml.
+
+    Replaces the old hard-coded Subject/QuestionType/KeyAbility enums.
+    Every subject-specific value lives here; the rest of the code reads
+    from this config rather than referencing magic strings.
+    """
+    name: str = "考研数学"
+    description: str = "考研数学题目智能整理"
+    vault_root: str = "./考研数学题库"
+    window_title: str = "📐 考研数学题目整理 Agent"
+
+    # Validation domains
+    categories: list[str] = Field(
+        default_factory=lambda: ["高等数学", "线性代数", "概率统计"],
+        description="Valid subject categories (the old Subject enum)",
+    )
+    question_types: list[str] = Field(
+        default_factory=lambda: ["选择题", "填空题", "解答题"],
+        description="Valid question types (the old QuestionType enum)",
+    )
+    key_abilities: list[str] = Field(
+        default_factory=lambda: ["概念辨析", "计算能力", "证明推理", "综合应用"],
+        description="Valid key ability labels (the old KeyAbility enum)",
+    )
+
+    # LLM persona & prompts
+    llm_persona: str = "考研数学辅导专家"
+    llm_task: str = "考研数学题目"
+    llm_description: str = "整理考研数学题目，输出结构化 JSON"
+
+    # Optional subsystems
+    opd: Optional[OPDConfig] = Field(default_factory=OPDConfig)
+    knowledge_tree: KnowledgeTreeConfig = Field(default_factory=KnowledgeTreeConfig)
 
 
 # ── Nested Models ────────────────────────────────────────────────────────────
@@ -81,16 +115,30 @@ class OpdMarkers(BaseModel):
 
 
 class Meta(BaseModel):
-    """题目元数据 — 对应 YAML frontmatter"""
-    subject: Subject
+    """题目元数据 — 对应 YAML frontmatter
+
+    subject, question_type, key_ability are free-form strings validated
+    against SubjectConfig at the application layer (not via enum).
+    """
+    subject: str = Field(
+        default="",
+        description="科目分类，如 '高等数学'（合法值见 SubjectConfig.categories）",
+    )
     lecture: str = Field(
+        default="",
         description="讲次名称，如 '第1讲_函数极限与连续'",
         min_length=1,
     )
-    question_type: QuestionType
+    question_type: str = Field(
+        default="",
+        description="题型，如 '解答题'（合法值见 SubjectConfig.question_types）",
+    )
     source: Source = Field(default_factory=Source)
     opd: OpdMarkers = Field(default_factory=OpdMarkers)
-    key_ability: list[KeyAbility] = Field(default_factory=list)
+    key_ability: list[str] = Field(
+        default_factory=list,
+        description="核心能力标签（合法值见 SubjectConfig.key_abilities）",
+    )
     tags: list[str] = Field(default_factory=list)
 
 
@@ -141,9 +189,9 @@ class Frontmatter(BaseModel):
     This model validates every field that appears in the frontmatter
     of a generated problem MD file.
     """
-    subject: Subject
-    lecture: str = Field(min_length=1)
-    question_type: QuestionType
+    subject: str = Field(default="")
+    lecture: str = Field(default="", min_length=1)
+    question_type: str = Field(default="")
     opd_target: str = Field(
         default="",
         description="O_ 目标代码",
@@ -151,7 +199,7 @@ class Frontmatter(BaseModel):
     )
     opd_procedures: list[str] = Field(default_factory=list)
     opd_details: list[str] = Field(default_factory=list)
-    key_ability: list[KeyAbility] = Field(default_factory=list)
+    key_ability: list[str] = Field(default_factory=list)
     source_book: str = Field(default="")
     source_example: str = Field(default="")
     source_year: str = Field(default="")
@@ -208,7 +256,7 @@ class PipelineConfig(BaseModel):
 
 
 class Settings(BaseModel):
-    """Top-level settings model matching config/settings.yml"""
+    """Top-level settings model matching config/settings.yml."""
     ocr: OcrConfig = Field(default_factory=OcrConfig)
     llm: LlmConfig = Field(default_factory=LlmConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
@@ -217,8 +265,6 @@ class Settings(BaseModel):
 
 
 # ── Queue Models ──────────────────────────────────────────────────────────────
-
-from enum import Enum as _Enum
 
 
 class QueueStatus(str, _Enum):

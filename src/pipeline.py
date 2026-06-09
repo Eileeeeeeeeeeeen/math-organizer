@@ -18,8 +18,8 @@ import requests
 import yaml
 
 from src.archive import ArchiveEngine
-from src.config import load_settings
-from src.models import ProblemRecord, Settings, QueueItem, QueueStatus
+from src.config import load_settings, load_subject_config
+from src.models import ProblemRecord, Settings, QueueItem, QueueStatus, SubjectConfig
 from src.validators.frontmatter_validator import validate_frontmatter
 from src.validators.naming_validator import generate_filename, validate_filename
 from src.validators.dedup import compute_problem_hash
@@ -527,34 +527,40 @@ def _call_paddleocr(image_path: Path) -> str:
 def _call_deepseek(ocr_text: str, settings: Settings) -> dict:
     """Call DeepSeek API with Tool Calling to get structured JSON."""
     api_key = _get_api_key("DEEPSEEK_API_KEY", settings)
+    subject = load_subject_config()
 
-    # Load JSON Schema
+    # Load JSON Schema template and patch enum values from SubjectConfig
     schema_path = Path(__file__).resolve().parent.parent / "templates" / "LLM 输出 JSON Schema.json"
     with open(schema_path, "r", encoding="utf-8") as f:
         json_schema = json.load(f)
+    _patch_schema_enums(json_schema, subject)
 
     # Load knowledge tree + OPD for system prompt
-    kt_path = Path(__file__).resolve().parent.parent / "config" / "knowledge_tree.yml"
-    opd_path = Path(__file__).resolve().parent.parent / "config" / "opd_markers.yml"
+    config_dir = Path(__file__).resolve().parent.parent / "config"
+    kt_path = config_dir / subject.knowledge_tree.file
     with open(kt_path, "r", encoding="utf-8") as f:
         knowledge_tree = f.read()
-    with open(opd_path, "r", encoding="utf-8") as f:
-        opd_markers = f.read()
 
-    system_prompt = _build_system_prompt(knowledge_tree, opd_markers)
+    opd_text = ""
+    if subject.opd and subject.opd.enabled:
+        opd_path = config_dir / subject.opd.config_file
+        if opd_path.exists():
+            opd_text = opd_path.read_text(encoding="utf-8")
+
+    system_prompt = _build_system_prompt(knowledge_tree, opd_text, subject)
     tool_parameters = {k: v for k, v in json_schema.items() if k != "$schema"}
 
     payload = {
         "model": settings.llm.model_default,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"请整理以下考研数学题目：\n\n{ocr_text}"},
+            {"role": "user", "content": f"请整理以下{subject.llm_task}：\n\n{ocr_text}"},
         ],
         "tools": [{
             "type": "function",
             "function": {
                 "name": "organize_math_problem",
-                "description": "整理考研数学题目，输出结构化 JSON",
+                "description": f"{subject.llm_description}",
                 "parameters": tool_parameters,
             },
         }],
@@ -653,35 +659,83 @@ def _safe_json_loads(raw: str) -> dict:
         return json.loads(fixed2)
 
 
-def _build_system_prompt(knowledge_tree: str, opd_markers: str) -> str:
-    return f"""你是考研数学辅导专家，精通考研数学知识体系。你的任务是将用户提供的数学题目整理为结构化的 JSON 格式。
+def _build_system_prompt(knowledge_tree: str, opd_text: str,
+                         subject: SubjectConfig | None = None) -> str:
+    """Build the system prompt dynamically from SubjectConfig.
 
-## 知识体系（只能从中选择知识点）
+    All subject-specific values (categories, question types, key abilities,
+    LLM persona, OPD markers) are read from config, not hard-coded.
+    """
+    if subject is None:
+        subject = load_subject_config()
+
+    cats = ", ".join(subject.categories)
+    qtypes = ", ".join(subject.question_types)
+    abilities = ", ".join(subject.key_abilities)
+
+    prompt = f"""你是{subject.llm_persona}，精通{subject.name}知识体系。你的任务是将用户提供的题目整理为结构化的 JSON 格式。
+
+## {subject.knowledge_tree.label}（只能从中选择知识点）
 
 {knowledge_tree}
+"""
+    # OPD section (conditional)
+    if subject.opd and subject.opd.enabled and opd_text:
+        prompt += f"""## {subject.opd.label}记号体系（只能从中选择 O/P/D 代码）
 
-## 解题方法论（OPD）记号体系（只能从中选择 O/P/D 代码）
+{opd_text}
 
-{opd_markers}
-
-## 输出要求
+"""
+    prompt += f"""## 输出要求
 
 1. 使用 organize_math_problem 函数输出结构化 JSON
 2. 所有数学公式必须使用 LaTeX 格式，**仅限** $...$（行内公式）和 $$...$$（独立行公式）两种分隔符。
    禁止使用 \\(...\\)、\\[...\\]、\\begin{{equation}}...\\end{{equation}} 等其他数学环境。
    示例：行内公式 $x^2 + y^2 = 1$，独立行公式 $$\\lim_{{x \\to 0}} \\frac{{\\sin x}}{{x}} = 1$$
-3. subject 必须从 [高等数学, 线性代数, 概率统计] 中选择
-4. lecture 必须从知识体系中的讲次名称中选择
-5. question_type 必须从 [选择题, 填空题, 解答题] 中选择
-6. OPD 标记只能从上述记号体系中选择
-7. key_ability 从 [概念辨析, 计算能力, 证明推理, 综合应用] 中选择
-8. solution.key_insight 直截了当指出该题的核心关键（如"极限转化为导数定义""利用对称性消去交叉项""构造辅助函数应用罗尔定理"）
-9. 解题步骤清晰，每步一个字符串元素
-10. solution.error_analysis：若用户提供了错因信息，必须详细分析：
+3. subject 必须从 [{cats}] 中选择
+4. lecture 必须从{subject.knowledge_tree.label}中的讲次名称中选择
+5. question_type 必须从 [{qtypes}] 中选择
+"""
+    if subject.opd and subject.opd.enabled:
+        prompt += f"6. OPD 标记只能从上述{subject.opd.label}记号体系中选择\n"
+        idx = 7
+    else:
+        idx = 6
+
+    prompt += f"""{idx}. key_ability 从 [{abilities}] 中选择
+{idx+1}. solution.key_insight 直截了当指出该题的核心关键
+{idx+2}. 解题步骤清晰，每步一个字符串元素
+{idx+3}. solution.error_analysis：若用户提供了错因信息，必须详细分析：
     - 错误根源：用户为何出错（概念混淆？计算失误？方法选错？）
     - 正确思路对比：用户的错误思路 vs 正确的解题路径
     - 避错策略：下次遇到同类题该如何规避此错误
     若用户未提供错因，error_analysis 留空字符串"""
+    return prompt
+
+
+def _patch_schema_enums(schema: dict, subject: SubjectConfig) -> None:
+    """Patch JSON Schema enum values in-place from SubjectConfig.
+
+    Replaces hard-coded enum lists in the schema template (subject,
+    question_type, key_ability) with values from the config file so
+    the LLM tool-calling contract stays in sync with the subject.
+    """
+    props = (
+        schema.get("properties", {})
+        .get("meta", {})
+        .get("properties", {})
+    )
+    if not props:
+        return
+
+    if "subject" in props:
+        props["subject"]["enum"] = subject.categories
+    if "question_type" in props:
+        props["question_type"]["enum"] = subject.question_types
+    if "key_ability" in props:
+        ka = props["key_ability"]
+        if "items" in ka:
+            ka["items"]["enum"] = subject.key_abilities
 
 
 def _get_api_key(env_var: str, settings: Optional[Settings] = None) -> str:

@@ -21,7 +21,6 @@ from src.archive import ArchiveEngine
 from src.config import load_settings
 from src.models import (
     ProblemRecord, QueueItem, QueueStatus, Settings,
-    Subject, QuestionType,
 )
 from src.pipeline import Pipeline
 
@@ -341,11 +340,11 @@ class Backend:
         # Apply adjustments
         try:
             if adjustments.get("subject_adj"):
-                item.record.meta.subject = Subject(adjustments["subject_adj"])
+                item.record.meta.subject = adjustments["subject_adj"]
             if adjustments.get("lecture_adj"):
                 item.record.meta.lecture = adjustments["lecture_adj"]
             if adjustments.get("qtype_adj"):
-                item.record.meta.question_type = QuestionType(adjustments["qtype_adj"])
+                item.record.meta.question_type = adjustments["qtype_adj"]
             if adjustments.get("opd_adj", "").strip():
                 item.record.meta.opd.target = adjustments["opd_adj"].strip()
         except ValueError as e:

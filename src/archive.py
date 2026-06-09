@@ -10,16 +10,13 @@ from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 
+from src.config import load_subject_config
 from src.models import ProblemRecord
 from src.validators.naming_validator import generate_filename
 
 # Jinja2 environment pointing to templates/ directory
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 _jinja_env = Environment(loader=FileSystemLoader(str(_TEMPLATE_DIR)), autoescape=False)
-
-# Expected subject → lecture mapping
-EXPECTED_SUBJECTS = {"高等数学", "线性代数", "概率统计"}
-EXPECTED_QUESTION_TYPES = {"选择题", "填空题", "解答题"}
 
 
 class ArchiveEngine:
@@ -33,7 +30,10 @@ class ArchiveEngine:
       - Dedup detection via SHA256
     """
 
-    def __init__(self, vault_root: str | Path = "./考研数学题库"):
+    def __init__(self, vault_root: str | Path | None = None):
+        if vault_root is None:
+            subject_cfg = load_subject_config()
+            vault_root = subject_cfg.vault_root
         self.vault_root = Path(vault_root).resolve()
         self.assets_dir = self.vault_root / "assets" / "images"
 
@@ -104,15 +104,16 @@ class ArchiveEngine:
 
     def _ensure_directories(self, record: ProblemRecord) -> Path:
         """Create subject/lecture/question_type dirs, return target directory."""
-        subject = record.meta.subject.value
+        subject = record.meta.subject
         lecture = record.meta.lecture
-        qtype = record.meta.question_type.value
+        qtype = record.meta.question_type
 
         target_dir = self.vault_root / subject / lecture / qtype
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # Ensure _index.md files exist at each level
-        self._ensure_index(self.vault_root, f"# 📚 考研数学题库 · 总索引\n")
+        subject_cfg = load_subject_config()
+        self._ensure_index(self.vault_root, f"# 📚 {subject_cfg.name}题库 · 总索引\n")
         self._ensure_index(
             self.vault_root / subject,
             f"# {subject}\n\n```dataview\nTABLE question_type AS \"题型\"\nFROM \"{subject}\"\nSORT lecture ASC\n```\n",
@@ -188,9 +189,9 @@ class ArchiveEngine:
         warnings: list[str] = []
         deleted_images: list[str] = []
 
-        subject = record.meta.subject.value
+        subject = record.meta.subject
         lecture = record.meta.lecture
-        qtype = record.meta.question_type.value
+        qtype = record.meta.question_type
 
         target_dir = self.vault_root / subject / lecture / qtype
         md_path = target_dir / filename
@@ -384,9 +385,9 @@ class ArchiveEngine:
 
     def _update_mocs(self, record: ProblemRecord, filename: str) -> None:
         """Append a link to the new file in the lecture-level _index.md."""
-        subject = record.meta.subject.value
+        subject = record.meta.subject
         lecture = record.meta.lecture
-        qtype = record.meta.question_type.value
+        qtype = record.meta.question_type
 
         lecture_index = self.vault_root / subject / lecture / "_index.md"
 

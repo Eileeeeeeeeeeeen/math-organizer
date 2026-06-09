@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from src.models import QueueItem, QueueStatus, ProblemRecord, Meta, Solution, Related, OpdMarkers, Source
-from src.models import Subject, QuestionType, KeyAbility
 
 
 @pytest.fixture
@@ -15,11 +14,11 @@ def sample_queue_item():
     """A sample QueueItem in WAITING_REVIEW state."""
     record = ProblemRecord(
         meta=Meta(
-            subject=Subject.GAO_SHU, lecture="第1讲_函数极限与连续",
-            question_type=QuestionType.XUAN_ZE,
+            subject="高等数学", lecture="第1讲_函数极限与连续",
+            question_type="选择题",
             source=Source(example_id="例1.3"),
             opd=OpdMarkers(target="O_极限", procedures=["P11_正向思路"], details=["D22_转换等价表述"]),
-            key_ability=[KeyAbility.CONCEPT],
+            key_ability=["概念辨析"],
             tags=["test"],
         ),
         problem="test problem",

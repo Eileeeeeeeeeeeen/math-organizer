@@ -1,0 +1,44 @@
+# 科目配置
+# 切换科目：修改此文件（或替换为 subjects/ 下的预设）
+# 格式说明见 CLAUDE.md "科目通用化" 章节
+
+subject:
+  name: "考研数学"
+  description: "考研数学题目智能整理"
+  vault_root: "./考研数学题库"
+  window_title: "📐 考研数学题目整理 Agent"
+
+  # 科目分类（LLM subject 字段的合法值）
+  categories:
+    - 高等数学
+    - 线性代数
+    - 概率统计
+
+  # 题型（LLM question_type 字段的合法值）
+  question_types:
+    - 选择题
+    - 填空题
+    - 解答题
+
+  # 核心能力标签
+  key_abilities:
+    - 概念辨析
+    - 计算能力
+    - 证明推理
+    - 综合应用
+
+  # LLM 角色设定
+  llm_persona: "考研数学辅导专家"
+  llm_task: "考研数学题目"
+  llm_description: "整理考研数学题目，输出结构化 JSON"
+
+  # 解题方法论（OPD）— 设为 false 禁用
+  opd:
+    enabled: true
+    label: "解题方法论（OPD）"
+    config_file: "opd_markers.yml"
+
+  # 知识体系
+  knowledge_tree:
+    file: "knowledge_tree.yml"
+    label: "知识体系"

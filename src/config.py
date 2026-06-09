@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from src.models import Settings
+from src.models import Settings, SubjectConfig
 
 # Default paths relative to project root
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -23,6 +23,49 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     if data is None:
         raise ValueError(f"Config file is empty: {path}")
     return data
+
+
+# ── Subject config (new — replaces hard-coded enums) ──────────────────────────
+
+_subject_config: SubjectConfig | None = None
+
+
+def load_subject_config(config_dir: Path | None = None) -> SubjectConfig:
+    """Load subject.yml and return a validated SubjectConfig.
+
+    The result is cached so repeated calls don't re-read the file.
+    Use invalidate_subject_cache() to force a reload.
+
+    Args:
+        config_dir: Path to the config directory. Defaults to PROJECT_ROOT/config.
+
+    Returns:
+        A validated SubjectConfig instance.
+
+    Raises:
+        FileNotFoundError: If config/subject.yml doesn't exist.
+        ValidationError: If the YAML doesn't match the SubjectConfig schema.
+    """
+    global _subject_config
+    if _subject_config is not None and config_dir is None:
+        return _subject_config
+
+    if config_dir is None:
+        config_dir = DEFAULT_CONFIG_DIR
+
+    raw = _load_yaml(config_dir / "subject.yml")
+    subject_data = raw.get("subject", raw)
+    _subject_config = SubjectConfig(**subject_data)
+    return _subject_config
+
+
+def invalidate_subject_cache() -> None:
+    """Clear the cached SubjectConfig so load_subject_config() re-reads the file."""
+    global _subject_config
+    _subject_config = None
+
+
+# ── Settings ──────────────────────────────────────────────────────────────────
 
 
 def load_settings(config_dir: Path | None = None) -> Settings:
@@ -44,12 +87,16 @@ def load_settings(config_dir: Path | None = None) -> Settings:
     return Settings(**data)
 
 
+# ── Knowledge tree ────────────────────────────────────────────────────────────
+
+
 def load_knowledge_tree(config_dir: Path | None = None) -> dict[str, dict[str, list[str]]]:
     """Load knowledge_tree.yml and return the typed tree.
 
+    Validates against the subject categories from SubjectConfig.
+
     Returns:
-        Dict of shape: {subject: {lecture: [knowledge_points]}}
-        where subject is one of: 高等数学, 线性代数, 概率统计
+        Dict of shape: {category: {lecture: [knowledge_points]}}
 
     Raises:
         FileNotFoundError: If knowledge_tree.yml doesn't exist.
@@ -58,8 +105,61 @@ def load_knowledge_tree(config_dir: Path | None = None) -> dict[str, dict[str, l
     if config_dir is None:
         config_dir = DEFAULT_CONFIG_DIR
     data = _load_yaml(config_dir / "knowledge_tree.yml")
-    _validate_knowledge_tree_structure(data)
+    subject = load_subject_config(config_dir)
+    _validate_knowledge_tree_structure(data, subject.categories)
     return data
+
+
+def _validate_knowledge_tree_structure(
+    data: dict[str, Any],
+    expected_subjects: set[str] | list[str] | None = None,
+) -> None:
+    """Validate the knowledge tree has the expected structure.
+
+    Args:
+        data: Parsed knowledge tree YAML.
+        expected_subjects: Valid top-level keys. If None, inferred from SubjectConfig.
+    """
+    if expected_subjects is None:
+        subject = load_subject_config()
+        expected_subjects = set(subject.categories)
+    elif not isinstance(expected_subjects, set):
+        expected_subjects = set(expected_subjects)
+
+    actual_subjects = set(data.keys())
+
+    if actual_subjects != expected_subjects:
+        missing = expected_subjects - actual_subjects
+        extra = actual_subjects - expected_subjects
+        msg = f"Knowledge tree subjects mismatch. Missing: {missing}, Extra: {extra}"
+        raise ValueError(msg)
+
+    for subject_name, lectures in data.items():
+        if not isinstance(lectures, dict):
+            raise ValueError(
+                f"Expected dict of lectures under '{subject_name}', "
+                f"got {type(lectures).__name__}"
+            )
+        for lecture_name, points in lectures.items():
+            if not lecture_name.startswith("第") or "讲" not in lecture_name:
+                raise ValueError(
+                    f"Invalid lecture name '{lecture_name}' under '{subject_name}'. "
+                    f"Expected format: '第N讲_XXX'"
+                )
+            if not isinstance(points, list):
+                raise ValueError(
+                    f"Expected list of knowledge points under "
+                    f"'{subject_name}/{lecture_name}', got {type(points).__name__}"
+                )
+            for i, point in enumerate(points):
+                if not isinstance(point, str) or not point.strip():
+                    raise ValueError(
+                        f"Empty or non-string knowledge point at "
+                        f"'{subject_name}/{lecture_name}[{i}]'"
+                    )
+
+
+# ── OPD markers ───────────────────────────────────────────────────────────────
 
 
 def load_opd_markers(config_dir: Path | None = None) -> dict[str, list[str]]:
@@ -77,41 +177,6 @@ def load_opd_markers(config_dir: Path | None = None) -> dict[str, list[str]]:
     data = _load_yaml(config_dir / "opd_markers.yml")
     _validate_opd_structure(data)
     return data
-
-
-def _validate_knowledge_tree_structure(data: dict[str, Any]) -> None:
-    """Validate the knowledge tree has the expected structure."""
-    expected_subjects = {"高等数学", "线性代数", "概率统计"}
-    actual_subjects = set(data.keys())
-
-    if actual_subjects != expected_subjects:
-        missing = expected_subjects - actual_subjects
-        extra = actual_subjects - expected_subjects
-        msg = f"Knowledge tree subjects mismatch. Missing: {missing}, Extra: {extra}"
-        raise ValueError(msg)
-
-    for subject, lectures in data.items():
-        if not isinstance(lectures, dict):
-            raise ValueError(
-                f"Expected dict of lectures under '{subject}', got {type(lectures).__name__}"
-            )
-        for lecture_name, points in lectures.items():
-            if not lecture_name.startswith("第") or "讲" not in lecture_name:
-                raise ValueError(
-                    f"Invalid lecture name '{lecture_name}' under '{subject}'. "
-                    f"Expected format: '第N讲_XXX'"
-                )
-            if not isinstance(points, list):
-                raise ValueError(
-                    f"Expected list of knowledge points under '{subject}/{lecture_name}', "
-                    f"got {type(points).__name__}"
-                )
-            for i, point in enumerate(points):
-                if not isinstance(point, str) or not point.strip():
-                    raise ValueError(
-                        f"Empty or non-string knowledge point at "
-                        f"'{subject}/{lecture_name}[{i}]'"
-                    )
 
 
 def _validate_opd_structure(data: dict[str, Any]) -> None:

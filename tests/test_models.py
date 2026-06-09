@@ -16,9 +16,6 @@ from src.models import (
     OpdMarkers,
     Source,
     Settings,
-    Subject,
-    QuestionType,
-    KeyAbility,
 )
 
 
@@ -28,9 +25,9 @@ class TestProblemRecord:
     def test_valid_record_passes(self, valid_problem_json):
         """A complete valid JSON should parse without errors."""
         record = ProblemRecord(**valid_problem_json)
-        assert record.meta.subject == Subject.GAO_SHU
+        assert record.meta.subject == "高等数学"
         assert record.meta.lecture == "第1讲_函数极限与连续"
-        assert record.meta.question_type == QuestionType.JIE_DA
+        assert record.meta.question_type == "解答题"
         assert record.meta.opd.target == "O_极限"
         assert len(record.solution.steps) == 3
 
@@ -41,13 +38,13 @@ class TestProblemRecord:
         with pytest.raises(ValidationError):
             ProblemRecord(**data)
 
-    def test_invalid_enum_raises(self):
-        """Invalid enum values should raise ValidationError."""
+    def test_lecture_empty_raises(self):
+        """Empty lecture should raise ValidationError (min_length=1)."""
         with pytest.raises(ValidationError):
             Meta(
-                subject="高等化学",  # not a valid subject
-                lecture="第1讲",
-                question_type="问答题",  # not a valid type
+                subject="高等数学",
+                lecture="",  # empty string violates min_length
+                question_type="解答题",
             )
 
     def test_approach_long_accepted(self):
@@ -62,28 +59,28 @@ class TestFrontmatter:
     def test_valid_frontmatter_passes(self):
         """A well-formed Frontmatter should parse without errors."""
         fm = Frontmatter(
-            subject=Subject.GAO_SHU,
+            subject="高等数学",
             lecture="第1讲_函数极限与连续",
-            question_type=QuestionType.XUAN_ZE,
+            question_type="选择题",
             opd_target="O_极限",
             opd_procedures=["P11_正向思路"],
             opd_details=["D22_转换等价表述"],
-            key_ability=[KeyAbility.CONCEPT, KeyAbility.CALCULATION],
+            key_ability=["概念辨析", "计算能力"],
             source_book="考研数学基础教程",
             source_example="例1.3",
             tags=["函数极限"],
             summary="考察分段函数在分段点处的连续性与可导性判定",
             created=date(2026, 1, 15),
         )
-        assert fm.subject == Subject.GAO_SHU
+        assert fm.subject == "高等数学"
 
     def test_summary_too_long_raises(self):
         """Summary > 100 chars should raise ValidationError."""
         with pytest.raises(ValidationError):
             Frontmatter(
-                subject=Subject.GAO_SHU,
+                subject="高等数学",
                 lecture="第1讲_函数极限与连续",
-                question_type=QuestionType.XUAN_ZE,
+                question_type="选择题",
                 opd_target="O_极限",
                 summary="这是一个超过了规定字数限制的超长摘要内容" * 10,  # way over 100
             )
@@ -92,9 +89,9 @@ class TestFrontmatter:
         """opd_target not matching O_ pattern should raise ValidationError."""
         with pytest.raises(ValidationError):
             Frontmatter(
-                subject=Subject.GAO_SHU,
+                subject="高等数学",
                 lecture="第1讲_函数极限与连续",
-                question_type=QuestionType.XUAN_ZE,
+                question_type="选择题",
                 opd_target="invalid_target",  # doesn't start with O_
             )
 

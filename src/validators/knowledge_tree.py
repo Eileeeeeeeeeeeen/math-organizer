@@ -1,10 +1,7 @@
 """Knowledge tree validator.
 
-Validates that config/knowledge_tree.yml conforms to the expected structure:
-  - Exactly 3 subjects: 高等数学, 线性代数, 概率统计
-  - Each lecture key matches pattern: 第N讲_XXX
-  - Each knowledge point is a non-empty string
-  - All subject and lecture names are consistent with other configs
+Validates that the knowledge tree YAML conforms to the expected structure.
+Subject names are cross-validated against config/subject.yml.
 """
 
 from __future__ import annotations
@@ -12,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from src.config import load_knowledge_tree
+from src.config import load_knowledge_tree, load_subject_config
 
 
 def validate_knowledge_tree(config_dir: Path | None = None) -> dict[str, Any]:
@@ -27,8 +24,6 @@ def validate_knowledge_tree(config_dir: Path | None = None) -> dict[str, Any]:
             "errors": list[str],
             "warnings": list[str],
         }
-
-    Also cross-validates lecture names against known OPD target codes.
     """
     errors: list[str] = []
     warnings: list[str] = []
@@ -37,6 +32,7 @@ def validate_knowledge_tree(config_dir: Path | None = None) -> dict[str, Any]:
     point_count = 0
 
     try:
+        subject_cfg = load_subject_config(config_dir)
         tree = load_knowledge_tree(config_dir)
     except (FileNotFoundError, ValueError) as e:
         return {
@@ -68,8 +64,8 @@ def validate_knowledge_tree(config_dir: Path | None = None) -> dict[str, Any]:
                     )
                 seen.add(pt)
 
-    # Cross-validate: check that the 3 canonical subject names are used
-    expected = {"高等数学", "线性代数", "概率统计"}
+    # Cross-validate: check subject names match SubjectConfig.categories
+    expected = set(subject_cfg.categories)
     actual = set(subjects)
     if actual != expected:
         missing = expected - actual

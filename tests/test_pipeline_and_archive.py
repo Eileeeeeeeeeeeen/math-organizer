@@ -10,7 +10,6 @@ import pytest
 from src.archive import ArchiveEngine
 from src.models import (
     ProblemRecord, Meta, Solution, Related, OpdMarkers, Source,
-    Subject, QuestionType, KeyAbility,
 )
 from src.validators.dedup import compute_problem_hash
 
@@ -20,9 +19,9 @@ def sample_record() -> ProblemRecord:
     """A valid ProblemRecord for testing archive."""
     return ProblemRecord(
         meta=Meta(
-            subject=Subject.GAO_SHU,
+            subject="高等数学",
             lecture="第1讲_函数极限与连续",
-            question_type=QuestionType.XUAN_ZE,
+            question_type="选择题",
             source=Source(
                 book="考研数学基础教程",
                 year="2026",
@@ -33,7 +32,7 @@ def sample_record() -> ProblemRecord:
                 procedures=["P11_正向思路"],
                 details=["D22_转换等价表述"],
             ),
-            key_ability=[KeyAbility.CONCEPT, KeyAbility.CALCULATION],
+            key_ability=["概念辨析", "计算能力"],
             tags=["函数极限", "无穷小比较"],
         ),
         problem=r"设函数 $f(x) = x^2\sin\frac{1}{x}$，讨论 $f(x)$ 在 $x=0$ 处的连续性与可导性。",

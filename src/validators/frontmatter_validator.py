@@ -12,7 +12,8 @@ from pathlib import Path
 
 import yaml
 
-from src.models import Frontmatter, Subject, QuestionType, KeyAbility
+from src.config import load_subject_config
+from src.models import Frontmatter
 from src.validators.opd_validator import is_valid_o_code, is_valid_p_code, is_valid_d_code
 
 # YAML frontmatter block marker
@@ -93,13 +94,14 @@ def validate_frontmatter(
     if errors:
         return {"valid": False, "errors": errors, "warnings": warnings, "data": data}
 
-    # ── Enum validation ──
-    _check_enum(data, "subject", {s.value for s in Subject}, errors)
-    _check_enum(data, "question_type", {q.value for q in QuestionType}, errors)
+    # ── Enum / domain validation (from SubjectConfig) ──
+    subject_cfg = load_subject_config(config_dir)
+    _check_enum(data, "subject", set(subject_cfg.categories), errors)
+    _check_enum(data, "question_type", set(subject_cfg.question_types), errors)
     # ── key_ability validation ──
     abilities = data.get("key_ability", [])
     if isinstance(abilities, list):
-        valid_abilities = {a.value for a in KeyAbility}
+        valid_abilities = set(subject_cfg.key_abilities)
         for ab in abilities:
             if ab not in valid_abilities:
                 errors.append(f"Invalid key_ability value: '{ab}'. Must be one of {valid_abilities}")

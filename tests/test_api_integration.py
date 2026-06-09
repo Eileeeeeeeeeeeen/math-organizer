@@ -339,13 +339,13 @@ def validate_llm_output(data: dict) -> ProblemRecord:
     """Validate the LLM JSON output against Pydantic models."""
     print("\n✅ Phase 3: Validation — checking against Pydantic models...")
     record = ProblemRecord(**data)
-    print(f"  Subject: {record.meta.subject.value}")
+    print(f"  Subject: {record.meta.subject}")
     print(f"  Lecture: {record.meta.lecture}")
-    print(f"  Type: {record.meta.question_type.value}")
+    print(f"  Type: {record.meta.question_type}")
     print(f"  OPD Target: {record.meta.opd.target}")
     print(f"  OPD Procedures: {record.meta.opd.procedures}")
     print(f"  OPD Details: {record.meta.opd.details}")
-    print(f"  Key Abilities: {[a.value for a in record.meta.key_ability]}")
+    print(f"  Key Abilities: {record.meta.key_ability}")
     print(f"  Approach: {record.solution.approach[:100]}...")
     print(f"  Steps: {len(record.solution.steps)} steps")
     return record
@@ -408,7 +408,7 @@ class TestFullPipeline:
 
         # Phase 3: Pydantic validation
         record = validate_llm_output(llm_output)
-        assert record.meta.subject.value in ("高等数学", "线性代数", "概率统计")
+        assert record.meta.subject in ("高等数学", "线性代数", "概率统计")
 
         # Phase 4: Generate filename & validate naming convention
         meta_dict = llm_output["meta"]
@@ -428,7 +428,7 @@ class TestFullPipeline:
         print("\n" + "=" * 60)
         print("🎉 Full pipeline SUCCESS!")
         print(f"   OCR: {len(ocr_text)} chars")
-        print(f"   LLM: {record.meta.subject.value} / {record.meta.lecture}")
+        print(f"   LLM: {record.meta.subject} / {record.meta.lecture}")
         print(f"   File: {filename}")
         print(f"   Validation: ALL PASSED")
         print("=" * 60)
@@ -466,9 +466,9 @@ def _render_markdown(record: ProblemRecord, filename: str) -> str:
     # Build YAML frontmatter
     fm_lines = [
         "---",
-        f"subject: {meta.subject.value}",
+        f"subject: {meta.subject}",
         f"lecture: {meta.lecture}",
-        f"question_type: {meta.question_type.value}",
+        f"question_type: {meta.question_type}",
         f"opd_target: {meta.opd.target}",
         "opd_procedures:",
     ]
@@ -479,7 +479,7 @@ def _render_markdown(record: ProblemRecord, filename: str) -> str:
         fm_lines.append(f"  - {d}")
     fm_lines.append("key_ability:")
     for ka in meta.key_ability:
-        fm_lines.append(f"  - {ka.value}")
+        fm_lines.append(f"  - {ka}")
     fm_lines.extend([
         f"source_book: {meta.source.book}",
         f"source_example: {meta.source.example_id}",

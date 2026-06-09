@@ -1,41 +1,31 @@
 """Directory structure validator.
 
-Validates that the vault directory (考研数学题库/) follows the
-prescribed 3-level structure:
-    考研数学题库/
-    ├── _index.md
-    ├── 高等数学/
-    │   ├── _index.md
-    │   └── 第N讲_XXX/
-    │       ├── _index.md
-    │       ├── 选择题/
-    │       ├── 填空题/
-    │       └── 解答题/
-    ├── 线性代数/
-    │   └── ...
-    ├── 概率统计/
-    │   └── ...
-    └── assets/
-        └── images/
+Validates that the vault directory follows the prescribed structure
+defined by SubjectConfig (categories, question_types).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-EXPECTED_SUBJECTS = {"高等数学", "线性代数", "概率统计"}
-EXPECTED_QUESTION_TYPES = {"选择题", "填空题", "解答题"}
+from src.config import load_subject_config
 
 
 def validate_directory_structure(vault_root: Path | str) -> dict:
     """Validate the directory structure of the vault.
 
+    Expected subjects and question types are read from config/subject.yml.
+
     Args:
-        vault_root: Path to the 考研数学题库/ directory.
+        vault_root: Path to the vault root directory.
 
     Returns:
         Dict with keys: valid, errors, warnings, structure (dict of what was found)
     """
+    subject_cfg = load_subject_config()
+    expected_subjects = set(subject_cfg.categories)
+    expected_qtypes = set(subject_cfg.question_types)
+
     errors: list[str] = []
     warnings: list[str] = []
     structure: dict[str, list[str]] = {}
@@ -69,7 +59,7 @@ def validate_directory_structure(vault_root: Path | str) -> dict:
         warnings.append(f"Missing assets/images/ directory: {assets_images}")
 
     # Check each subject directory
-    for subject in EXPECTED_SUBJECTS:
+    for subject in expected_subjects:
         subject_dir = root / subject
         structure[subject] = []
 
@@ -104,7 +94,7 @@ def validate_directory_structure(vault_root: Path | str) -> dict:
                     if sub_item.is_dir():
                         lecture_qtypes_found.add(sub_item.name)
 
-                unexpected = lecture_qtypes_found - EXPECTED_QUESTION_TYPES
+                unexpected = lecture_qtypes_found - expected_qtypes
                 if unexpected:
                     warnings.append(
                         f"Unexpected subdirectories in {item.name}: {unexpected}"

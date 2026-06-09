@@ -1,5 +1,6 @@
-# Math Organizer — 考研数学题目智能整理 Agent
+# Math Organizer — 科目通用题目智能整理 Agent
 # 单进程架构，无需 Redis/Celery/FastAPI
+# 科目由 config/subject.yml 控制，切换配置文件即可换科目
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -20,9 +21,9 @@ COPY pyproject.toml .
 COPY tests/ tests/
 
 # ── 创建运行时挂载点 ──
-# config/ → 挂载宿主机 config/（含 API key）
-# 考研数学题库/ → 挂载宿主机 vault（用户数据）
-RUN mkdir -p /app/config /app/考研数学题库
+# config/ → 挂载宿主机 config/（含 API key + subject.yml）
+# vault/ → 挂载宿主机题库目录（路径由 subject.yml 控制）
+RUN mkdir -p /app/config /app/vault
 
 ENV PYTHONPATH=/app
 EXPOSE 7880

@@ -74,21 +74,24 @@ def temp_vault():
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         root = Path(tmpdir)
-        # Create structure
+        # Create structure from SubjectConfig
+        from src.config import load_subject_config
+        cfg = load_subject_config()
         (root / "_index.md").write_text("# Test Vault", encoding="utf-8")
         (root / "assets" / "images").mkdir(parents=True)
 
-        for subject in ["高等数学", "线性代数", "概率统计"]:
+        first_subject = cfg.categories[0] if cfg.categories else "默认科目"
+        for subject in cfg.categories:
             subject_dir = root / subject
             subject_dir.mkdir()
             (subject_dir / "_index.md").write_text(f"# {subject}", encoding="utf-8")
 
-            # Create one lecture with question type dirs
-            if subject == "高等数学":
+            # Create one lecture with question type dirs for the first subject
+            if subject == first_subject:
                 lecture_dir = subject_dir / "第1讲_函数极限与连续"
                 lecture_dir.mkdir()
                 (lecture_dir / "_index.md").write_text("# 第1讲", encoding="utf-8")
-                for qtype in ["选择题", "填空题", "解答题"]:
+                for qtype in cfg.question_types:
                     (lecture_dir / qtype).mkdir()
 
         yield root

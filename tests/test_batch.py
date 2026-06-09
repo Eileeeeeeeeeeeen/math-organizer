@@ -139,15 +139,14 @@ class TestPipelineBatchNoApi:
             call_times.append(time.time())
             time.sleep(0.05)  # Small delay to test concurrency
             from src.models import ProblemRecord, Meta, Solution, Related, OpdMarkers, Source
-            from src.models import Subject, QuestionType, KeyAbility
             return ProblemRecord(
                 meta=Meta(
-                    subject=Subject.GAO_SHU,
+                    subject="高等数学",
                     lecture="第1讲_函数极限与连续",
-                    question_type=QuestionType.XUAN_ZE,
+                    question_type="选择题",
                     source=Source(example_id="test"),
                     opd=OpdMarkers(target="O_极限"),
-                    key_ability=[KeyAbility.CONCEPT],
+                    key_ability=["概念辨析"],
                 ),
                 problem=f"problem {text[:10]}",
                 answer="42",
@@ -182,14 +181,13 @@ class TestPipelineBatchNoApi:
             if "fail" in text:
                 raise RuntimeError("simulated failure")
             from src.models import ProblemRecord, Meta, Solution, Related, OpdMarkers, Source
-            from src.models import Subject, QuestionType, KeyAbility
             return ProblemRecord(
                 meta=Meta(
-                    subject=Subject.GAO_SHU, lecture="第1讲_函数极限与连续",
-                    question_type=QuestionType.XUAN_ZE,
+                    subject="高等数学", lecture="第1讲_函数极限与连续",
+                    question_type="选择题",
                     source=Source(example_id="test"),
                     opd=OpdMarkers(target="O_极限"),
-                    key_ability=[KeyAbility.CONCEPT],
+                    key_ability=["概念辨析"],
                 ),
                 problem=text, answer="42",
                 solution=Solution(approach="test", key_insight="test", steps=["step"]),
@@ -215,14 +213,13 @@ class TestPipelineBatchNoApi:
         """Progress callback should be invoked during processing."""
         def mock_run_llm(self, text):
             from src.models import ProblemRecord, Meta, Solution, Related, OpdMarkers, Source
-            from src.models import Subject, QuestionType, KeyAbility
             return ProblemRecord(
                 meta=Meta(
-                    subject=Subject.GAO_SHU, lecture="第1讲_函数极限与连续",
-                    question_type=QuestionType.XUAN_ZE,
+                    subject="高等数学", lecture="第1讲_函数极限与连续",
+                    question_type="选择题",
                     source=Source(example_id="test"),
                     opd=OpdMarkers(target="O_极限"),
-                    key_ability=[KeyAbility.CONCEPT],
+                    key_ability=["概念辨析"],
                 ),
                 problem=text, answer="42",
                 solution=Solution(approach="test", key_insight="test", steps=["step"]),

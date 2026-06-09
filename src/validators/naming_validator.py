@@ -2,11 +2,12 @@
 
 Enforces the naming format: {讲次编号}_{题目类型}_{例号或序号}_{简短描述}.md
 
-Rules (from 文件命名规范.txt and planning doc §7.3):
+Rules:
   - 讲次编号 must match knowledge tree lecture names
-  - 题目类型 must be: 选择题, 填空题, 解答题
+  - 题目类型 must be one of the configured question types
   - 简短描述 must be ≤ 15 Chinese characters
   - No underscores in the description part (underscores only as separators)
+  - Valid question types are read from config/subject.yml
 """
 
 from __future__ import annotations
@@ -14,18 +15,25 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# Regex for the full filename pattern:
-#   第N讲_题型_例号_简短描述.md
-FILENAME_PATTERN = re.compile(
-    r"^(第\d+讲)_"             # 讲次编号 (e.g., 第1讲)
-    r"(选择题|填空题|解答题)_"   # 题目类型
-    r"([^_]+)_"                # 例号或序号 (no underscores allowed)
-    r"(.{1,15})"               # 简短描述 (1-15 chars)
-    r"\.md$"                   # .md extension
+from src.config import load_subject_config
+
+# Regex for the full filename pattern (question types patched at runtime)
+#  第N讲_题型_例号_简短描述.md
+# The question-type alternation is built dynamically from SubjectConfig.
+_FILENAME_REGEX_TEMPLATE = (
+    r"^(第\d+讲)_"            # 讲次编号 (e.g., 第1讲)
+    r"({qtypes})_"            # 题目类型 (from config)
+    r"([^_]+)_"               # 例号或序号 (no underscores allowed)
+    r"(.{{1,15}})"            # 简短描述 (1-15 chars) — doubled braces for format()
+    r"\.md$"                  # .md extension
 )
 
-# Valid question type values
-VALID_QUESTION_TYPES = {"选择题", "填空题", "解答题"}
+
+def _build_filename_pattern() -> re.Pattern:
+    """Build a filename regex from the current SubjectConfig question types."""
+    subject = load_subject_config()
+    alt = "|".join(re.escape(t) for t in subject.question_types)
+    return re.compile(_FILENAME_REGEX_TEMPLATE.format(qtypes=alt))
 
 
 def validate_filename(filename: str, knowledge_tree: dict | None = None) -> dict:
@@ -38,6 +46,8 @@ def validate_filename(filename: str, knowledge_tree: dict | None = None) -> dict
     Returns:
         Dict with keys: valid, errors, warnings, parsed (dict of extracted parts)
     """
+    subject = load_subject_config()
+    valid_qtypes = set(subject.question_types)
     errors: list[str] = []
     warnings: list[str] = []
     parsed: dict = {}
@@ -45,7 +55,8 @@ def validate_filename(filename: str, knowledge_tree: dict | None = None) -> dict
     # Strip path if present
     basename = Path(filename).name
 
-    match = FILENAME_PATTERN.match(basename)
+    pattern = _build_filename_pattern()
+    match = pattern.match(basename)
     if not match:
         errors.append(
             f"Filename '{basename}' does not match pattern: "
@@ -63,7 +74,7 @@ def validate_filename(filename: str, knowledge_tree: dict | None = None) -> dict
     }
 
     # Validate question type
-    if qtype not in VALID_QUESTION_TYPES:
+    if qtype not in valid_qtypes:
         errors.append(f"Invalid question type: '{qtype}'")
 
     # Validate short description is mostly Chinese (no LaTeX)
@@ -102,14 +113,14 @@ def generate_filename(meta: dict, problem: str = "") -> str:
     Returns:
         A filename string matching the convention.
     """
+    subject = load_subject_config()
+    default_qtype = subject.question_types[0] if subject.question_types else "解答题"
+
     lecture_full = meta.get("lecture", "第X讲")
     # Extract just the lecture number part
     lecture_num = lecture_full.split("_")[0] if "_" in lecture_full else lecture_full
 
-    qtype = meta.get("question_type", "解答题")
-    # Handle case where enum member is passed instead of string value
-    if hasattr(qtype, "value"):
-        qtype = qtype.value
+    qtype = meta.get("question_type", default_qtype)
 
     source = meta.get("source", {})
     if isinstance(source, dict):

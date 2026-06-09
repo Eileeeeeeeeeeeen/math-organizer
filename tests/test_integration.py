@@ -50,7 +50,7 @@ class TestJsonSchemaIntegration:
         """The valid_problem.json fixture should parse as ProblemRecord."""
         from src.models import ProblemRecord
         record = ProblemRecord(**valid_problem_json)
-        assert record.meta.subject.value == "高等数学"
+        assert record.meta.subject == "高等数学"
 
     def test_missing_field_json_fails(self, test_data_dir):
         """Invalid JSON should fail Pydantic validation."""
@@ -152,7 +152,7 @@ class TestEndToEnd:
 
         # 1. Validate LLM JSON output
         record = ProblemRecord(**valid_problem_json)
-        assert record.meta.subject.value == "高等数学"
+        assert record.meta.subject == "高等数学"
 
         # 2. Validate vault directory structure
         dir_result = validate_directory_structure(temp_vault)

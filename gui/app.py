@@ -15,7 +15,8 @@ from pathlib import Path
 import gradio as gr
 
 from backend.engine import Backend
-from src.models import QueueItem, QueueStatus, Subject, QuestionType
+from src.config import load_subject_config
+from src.models import QueueItem, QueueStatus
 
 # ── Clipboard paste JavaScript (injected into page <head>) ──────────────────
 
@@ -62,6 +63,26 @@ _backend.set_auto_llm(True)
 # Accumulator for all pending files — paste, drag, or file dialog — so each
 # new action appends instead of replacing previous files in gr.File.
 _pending_files: list[str] = []
+
+
+def _default_subject() -> str:
+    """Return the first subject category from config (for GUI defaults)."""
+    cfg = load_subject_config()
+    return cfg.categories[0] if cfg.categories else ""
+
+
+def _default_qtype() -> str:
+    """Return the first question type from config (for GUI defaults)."""
+    cfg = load_subject_config()
+    return cfg.question_types[0] if cfg.question_types else ""
+
+
+def _subject_choices() -> list[str]:
+    return load_subject_config().categories
+
+
+def _qtype_choices() -> list[str]:
+    return load_subject_config().question_types
 
 
 # ── Render helpers (pure presentation, local to GUI) ───────────────────────────
@@ -349,7 +370,7 @@ def _build_detail_from_state(state: dict) -> tuple:
     nav = _nav_info(state)
 
     if item is None:
-        return qhtml, "", "", "", {}, "高等数学", "", "解答题", "", "", nav, qhtml
+        return qhtml, "", "", "", {}, _default_subject(), "", _default_qtype(), "", "", nav, qhtml
 
     ocr_text = item.ocr_text or ""
     record_dict = item.record.model_dump() if item.record else {}
@@ -359,14 +380,14 @@ def _build_detail_from_state(state: dict) -> tuple:
         m = item.record.meta
         return (
             qhtml, ocr_text, ocr_text, md, record_dict,
-            m.subject.value, m.lecture, m.question_type.value,
+            m.subject, m.lecture, m.question_type,
             m.opd.target or "",
             f"🔑 {item.record.solution.key_insight}" if item.record.solution.key_insight else "",
             nav, qhtml,
         )
     return (
         qhtml, ocr_text, ocr_text, md, record_dict,
-        "高等数学", "", "解答题", "", "", nav, qhtml,
+        _default_subject(), "", _default_qtype(), "", "", nav, qhtml,
     )
 
 
@@ -421,7 +442,7 @@ def handle_select_item(idx_str: str = "") -> tuple:
     nav = _nav_info(state)
 
     if item is None:
-        return "", "", "", {}, "高等数学", "", "解答题", "", "", nav, qhtml
+        return "", "", "", {}, _default_subject(), "", _default_qtype(), "", "", nav, qhtml
 
     ocr_text = item.ocr_text or ""
     record_dict = item.record.model_dump() if item.record else {}
@@ -431,14 +452,14 @@ def handle_select_item(idx_str: str = "") -> tuple:
         m = item.record.meta
         return (
             ocr_text, ocr_text, md, record_dict,
-            m.subject.value, m.lecture, m.question_type.value,
+            m.subject, m.lecture, m.question_type,
             m.opd.target or "",
             f"🔑 {item.record.solution.key_insight}" if item.record.solution.key_insight else "",
             nav, qhtml,
         )
     return (
         ocr_text, ocr_text, md, record_dict,
-        "高等数学", "", "解答题", "", "", nav, qhtml,
+        _default_subject(), "", _default_qtype(), "", "", nav, qhtml,
     )
 
 
@@ -452,7 +473,7 @@ def handle_poll() -> tuple:
     item = items[idx] if 0 <= idx < len(items) else None
 
     if item is None:
-        return qhtml, nav, "", "", "*暂无内容*", {}, "", "高等数学", "", "解答题", ""
+        return qhtml, nav, "", "", "*暂无内容*", {}, "", _default_subject(), "", _default_qtype(), ""
 
     ocr_text = item.ocr_text or ""
     record_dict = item.record.model_dump() if item.record else {}
@@ -463,12 +484,12 @@ def handle_poll() -> tuple:
         return (
             qhtml, nav, ocr_text, ocr_text, md, record_dict,
             f"🔑 {item.record.solution.key_insight}" if item.record.solution.key_insight else "",
-            m.subject.value, m.lecture, m.question_type.value,
+            m.subject, m.lecture, m.question_type,
             m.opd.target or "",
         )
     return (
         qhtml, nav, ocr_text, ocr_text, md, record_dict,
-        "", "高等数学", "", "解答题", "",
+        "", _default_subject(), "", _default_qtype(), "",
     )
 
 
@@ -562,7 +583,7 @@ def handle_clear_queue() -> tuple:
     empty_html = _render_queue_html([], 0)
     return (
         empty_html, "", "", "", {},
-        "高等数学", "", "解答题", "", "",
+        _default_subject(), "", _default_qtype(), "", "",
         "队列已清空", empty_html,
     )
 
@@ -666,8 +687,9 @@ def handle_download_vault() -> str:
 # ── Build UI ───────────────────────────────────────────────────────────────────
 
 def create_app() -> gr.Blocks:
-    with gr.Blocks(title=_backend.settings.gui.title) as app:
-        gr.Markdown(f"# {_backend.settings.gui.title}")
+    subject_cfg = load_subject_config()
+    with gr.Blocks(title=subject_cfg.window_title) as app:
+        gr.Markdown(f"# {subject_cfg.window_title}")
 
         # ═══ Top Bar ═══
         with gr.Row():
@@ -774,19 +796,19 @@ def create_app() -> gr.Blocks:
 
                             with gr.Row():
                                 adj_subject = gr.Dropdown(
-                                    label="科目", choices=["高等数学", "线性代数", "概率统计"],
-                                    value="高等数学", scale=1,
+                                    label="科目", choices=_subject_choices(),
+                                    value=_default_subject(), scale=1,
                                 )
                                 adj_lecture = gr.Textbox(
                                     label="讲次", placeholder="第1讲_函数极限与连续", scale=2,
                                 )
                             with gr.Row():
                                 adj_qtype = gr.Dropdown(
-                                    label="题型", choices=["选择题", "填空题", "解答题"],
-                                    value="解答题", scale=1,
+                                    label="题型", choices=_qtype_choices(),
+                                    value=_default_qtype(), scale=1,
                                 )
                                 adj_opd_target = gr.Textbox(
-                                    label="OPD 目标", placeholder="O_极限", scale=1,
+                                    label="OPD 目标", placeholder="O_目标代码", scale=1,
                                 )
 
                         # ④ MD Preview
