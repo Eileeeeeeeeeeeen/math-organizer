@@ -1,4 +1,4 @@
-# 📐 考研数学题目智能整理 Agent
+# 📐 科目通用题目智能整理 Agent
 
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -6,9 +6,11 @@
 
 [English](README.md)
 
-> 截图 → OCR → LLM → Obsidian 题库，全流程自动化的考研数学题目整理工具。
+> 截图 → OCR → LLM → Obsidian 题库，全流程自动化，科目可配置。
 
-**Math Organizer** 将考研数学题目截图转化为结构化、可检索的 [Obsidian](https://obsidian.md/) 知识库。截图、粘贴（Ctrl+V），流水线自动完成剩余工作：OCR 识别、LLM 分类与解答提取，然后归档为带有 LaTeX 公式渲染和 OPD（目标-思路-细节）解题方法论标注的 Markdown 文件。
+**Math Organizer** 将题目截图转化为结构化、可检索的 [Obsidian](https://obsidian.md/) 知识库。截图、粘贴（Ctrl+V），流水线自动完成剩余工作：OCR 识别、LLM 分类与解答提取，然后归档为带有 LaTeX 公式渲染和可选 OPD（目标-思路-细节）解题方法论标注的 Markdown 文件。
+
+**已支持科目通用化**：所有科目相关配置（分类、题型、能力标签、LLM 角色、知识树）均集中于 `config/subject.yml`。替换此文件即可适配考研英语、考研政治、计算机 408 等不同科目 — 无需修改任何代码。
 
 ## 🎯 工作流程
 
@@ -25,15 +27,17 @@
 | 功能 | 说明 |
 |------|------|
 | 📸 **截图→题库** | 端到端：粘贴截图，获得格式化的 Markdown 题目文件 |
-| 🏷️ **自动分类** | 3 科目 × 36 讲次 × 题型，由知识树配置驱动 |
-| 💡 **OPD 解题法** | 目标-思路-细节三级标注 + `key_insight` 关键点 |
-| 🧮 **LaTeX 渲染** | 完整数学公式支持，Obsidian 原生渲染 |
+| 🔀 **科目通用** | 所有分类/题型/能力标签/提示词 集中配置于 `config/subject.yml` |
+| 🏷️ **自动分类** | 可配置科目 × 讲次 × 题型，由 YAML 知识树驱动 |
+| 💡 **OPD 解题法** | 目标-思路-细节三级标注 + `key_insight` 关键点（可按科目关闭） |
+| 🧮 **LaTeX 渲染** | 完整数学公式支持（仅 `$...$` / `$$...$$`），Obsidian 原生渲染 |
 | ⚡ **4 种自动模式** | 自动入队/自动 OCR/自动 LLM/自动归档，可独立开关 |
 | 📋 **审核面板** | 接受前调整科目/讲次/题型/OPD，或跳过/重做/删除 |
 | 📂 **题库浏览** | 可折叠目录树，点击查看，应用内删除 |
 | 📦 **ZIP 导出** | 一键下载完整题库 |
 | 🐳 **Docker** | 一次构建，到处运行 — config 和 vault 外部挂载 |
 | ⌨️ **Ctrl+V 粘贴** | 剪贴板截图直接入队 |
+| 📎 **多文件累积** | 拖拽/粘贴/选择多次 — 文件累积不替换，直到点击"添加" |
 
 ## 🚀 快速开始
 
@@ -114,6 +118,30 @@ PYTHONPATH=. python -m pytest tests/ -q -m integration -s
 - API keys 存放于 `config/settings.yml` — 不依赖环境变量
 - 全内存队列（重启即清空）
 
+## 🔀 切换科目
+
+编辑 `config/subject.yml` 即可适配不同科目。例如从数学切换为英语：
+
+```yaml
+# config/subject.yml
+subject:
+  name: "考研英语"
+  vault_root: "./考研英语题库"
+  window_title: "📖 考研英语题目整理 Agent"
+  categories: [阅读理解, 完形填空, 翻译, 写作]
+  question_types: [选择题, 翻译题, 写作题]
+  key_abilities: [词汇理解, 长难句分析, 篇章结构, 推理判断]
+  llm_persona: "考研英语辅导专家"
+  llm_task: "考研英语题目"
+  llm_description: "整理考研英语题目，输出结构化 JSON"
+  opd:
+    enabled: false  # 英语不需要 OPD 解题方法论
+  knowledge_tree:
+    file: "knowledge_trees/english.yml"
+```
+
+然后创建对应的知识树 YAML 文件，重启应用即可。下拉框选项、System Prompt、目录名称全部自动适配。
+
 ## 📁 题库结构
 
 ```
@@ -138,10 +166,11 @@ PYTHONPATH=. python -m pytest tests/ -q -m integration -s
 
 | 限制 | 原因 |
 |------|------|
-| 仅支持 DeepSeek API | LLM provider 硬编码 |
+| 仅支持 DeepSeek + PaddleOCR | API provider 硬编码（待配置化） |
 | 无用户认证 | 定位为单用户桌面工具 |
 | 内存队列 | 重启应用会丢失队列 |
 | 粘贴按钮不可用 | 浏览器安全策略限制，请使用 Ctrl+V |
+| 单科目运行 | 一次只能配置一个科目（多科目切换已规划） |
 
 ## 📄 许可证
 

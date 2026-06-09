@@ -1,4 +1,4 @@
-# 📐 Math Organizer
+# 📐 Math Organizer — Subject-Agnostic Exam Prep Vault Builder
 
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -6,9 +6,11 @@
 
 [中文版](README.zh-CN.md)
 
-> Smart knowledge-base builder for graduate math exam prep — OCR → LLM → Obsidian vault, fully automated.
+> Screenshot → OCR → LLM → Obsidian vault — fully automated, subject-agnostic.
 
-**Math Organizer** turns screenshots of math problems into a structured, searchable [Obsidian](https://obsidian.md/) vault. Snap a screenshot, paste it (Ctrl+V), and the pipeline does the rest: OCR recognition, LLM-powered classification & solution extraction, then archival into a clean Markdown knowledge base with LaTeX rendering and OPD (Objective–Plan–Detail) solution annotations.
+**Math Organizer** turns screenshots of exam problems into a structured, searchable [Obsidian](https://obsidian.md/) vault. Snap a screenshot, paste it (Ctrl+V), and the pipeline does the rest: OCR recognition, LLM-powered classification & solution extraction, then archival into a clean Markdown knowledge base with LaTeX rendering and optional OPD (Objective–Plan–Detail) solution annotations.
+
+**Now subject-agnostic:** all subject-specific settings (categories, question types, key ability labels, LLM persona, knowledge tree) live in `config/subject.yml`. Swap this file to repurpose the tool for English, Politics, Computer Science, or any other exam subject — no code changes needed.
 
 ## 🎯 What It Does
 
@@ -25,15 +27,17 @@ Screenshot → PaddleOCR → DeepSeek LLM → Human Review → Obsidian Vault
 | Feature | Detail |
 |---------|--------|
 | 📸 **Screenshot → Vault** | End-to-end: paste screenshot, get a formatted Markdown problem entry |
-| 🏷️ **Auto-Classification** | 3 subjects × 36 lectures × question types, driven by a configurable knowledge tree |
-| 💡 **OPD Solution Method** | Objective–Plan–Detail structured solutions with `key_insight` highlights |
-| 🧮 **LaTeX Rendering** | Full math formula support, rendered in Obsidian natively |
+| 🔀 **Subject-Agnostic** | All categories, question types, abilities, and prompts in `config/subject.yml` |
+| 🏷️ **Auto-Classification** | Configurable categories × lectures × question types, driven by a YAML knowledge tree |
+| 💡 **OPD Solution Method** | Objective–Plan–Detail structured solutions with `key_insight` highlights (optional per subject) |
+| 🧮 **LaTeX Rendering** | Full math formula support (`$...$` / `$$...$$` only, Obsidian-native) |
 | ⚡ **4 Auto Modes** | Auto-add, auto-OCR, auto-LLM, auto-archive — toggle individually or go fully hands-off |
 | 📋 **Review Panel** | Adjust subject/lecture/type/OPD before accepting — or skip/reprocess/delete |
 | 📂 **Vault Browser** | Collapsible tree view, click-to-read, in-app delete |
 | 📦 **ZIP Export** | One-click download of the entire vault |
 | 🐳 **Docker** | Build once, run anywhere — config & vault mounted externally |
 | ⌨️ **Ctrl+V Paste** | Clipboard screenshot directly into the queue |
+| 📎 **Multi-File Accumulation** | Drag, paste, or select multiple times — files accumulate until you click "Add" |
 
 ## 🚀 Quick Start
 
@@ -114,6 +118,30 @@ PYTHONPATH=. python -m pytest tests/ -q -m integration -s
 - API keys in `config/settings.yml` — no env var dependencies
 - Fully in-memory queue (restart = fresh start)
 
+## 🔀 Switching Subjects
+
+Edit `config/subject.yml` to adapt the tool for a different exam. Example: switching from Math to English:
+
+```yaml
+# config/subject.yml
+subject:
+  name: "考研英语"
+  vault_root: "./考研英语题库"
+  window_title: "📖 考研英语题目整理 Agent"
+  categories: [阅读理解, 完形填空, 翻译, 写作]
+  question_types: [选择题, 翻译题, 写作题]
+  key_abilities: [词汇理解, 长难句分析, 篇章结构, 推理判断]
+  llm_persona: "考研英语辅导专家"
+  llm_task: "考研英语题目"
+  llm_description: "整理考研英语题目，输出结构化 JSON"
+  opd:
+    enabled: false  # English doesn't need OPD
+  knowledge_tree:
+    file: "knowledge_trees/english.yml"
+```
+
+Then create the corresponding knowledge tree YAML and restart the app. Everything — dropdowns, system prompts, directory names — adapts automatically.
+
 ## 📁 Vault Structure
 
 ```
@@ -138,10 +166,11 @@ Each problem file includes YAML frontmatter (subject, lecture, type, OPD tags) +
 
 | Limitation | Reason |
 |------------|--------|
-| DeepSeek-only LLM | Provider is hardcoded |
+| DeepSeek + PaddleOCR only | API providers are hardcoded (config-driven providers planned) |
 | No auth / multi-user | Designed as a single-user desktop tool |
 | In-memory queue | Restarting the app loses the queue |
 | Clipboard button unavailable | Browser security model; use Ctrl+V |
+| Single-subject at a time | One `subject.yml` active; multi-subject switching planned |
 
 ## 📄 License
 
