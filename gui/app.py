@@ -59,6 +59,10 @@ _backend = Backend()
 _backend.set_auto_ocr(True)
 _backend.set_auto_llm(True)
 
+# Accumulator for all pending files — paste, drag, or file dialog — so each
+# new action appends instead of replacing previous files in gr.File.
+_pending_files: list[str] = []
+
 
 # ── Render helpers (pure presentation, local to GUI) ───────────────────────────
 
@@ -153,6 +157,37 @@ def _render_queue_html(items: list[QueueItem], selected_idx: int,
     )
 
     return table + pagination
+
+
+def _render_pending_files_html() -> str:
+    """Render the list of pending files waiting to be added to the queue."""
+    if not _pending_files:
+        return ""
+    lines = ['<div style="font-size:12px;padding:4px 0;color:#888;">'
+             f'📎 待添加 ({len(_pending_files)}):</div>']
+    for i, f in enumerate(_pending_files):
+        name = Path(f).name
+        if len(name) > 32:
+            name = name[:29] + "..."
+        # Each file row with a remove button
+        lines.append(
+            f'<div style="display:flex;align-items:center;gap:4px;'
+            f'font-size:11px;padding:2px 4px;margin:1px 0;'
+            f'background:rgba(99,102,241,0.08);border-radius:3px;">'
+            f'<span style="color:#d1d5db;flex:1;overflow:hidden;'
+            f'text-overflow:ellipsis;white-space:nowrap;">{name}</span>'
+            f'<span onclick="(function(e){{'
+            f"var el=document.querySelector('#remove_pending textarea, #remove_pending input');"
+            f'if(!el)return;'
+            f"var p=el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;"
+            f"Object.getOwnPropertyDescriptor(p,'value').set.call(el,String({i}));"
+            f"el.dispatchEvent(new InputEvent('input',{{bubbles:true,inputType:'insertText'}}));"
+            f'}})(event)" '
+            f'style="cursor:pointer;color:#ef4444;font-weight:bold;'
+            f'padding:0 4px;" title="移除">✕</span>'
+            f'</div>'
+        )
+    return "\n".join(lines)
 
 
 def _render_queue_from_state(state: dict) -> str:
@@ -339,23 +374,34 @@ def _build_detail_from_state(state: dict) -> tuple:
 
 
 def handle_add_images(files: list[str] | None, notes: str) -> tuple:
-    """Add images to queue via Backend. Fast — no blocking work."""
-    if not files:
-        state = _backend.get_state()
-        return _render_queue_html([], 0), "⚠️ 请上传图片文件", None, notes
+    """Add images to queue via Backend. Fast — no blocking work.
 
-    file_list = [str(Path(f).resolve()) for f in files if f]
+    Uses _pending_files (accumulated from paste/drag/select) as the source
+    of truth, NOT the gr.File component value (which may be stale/empty).
+    """
+    global _pending_files
+    # Fallback: if _pending_files is empty but files were passed directly
+    # (e.g. from auto_add flow), use those instead.
+    source = _pending_files if _pending_files else ([str(Path(f).resolve()) for f in files if f] if files else [])
+    if not source:
+        state = _backend.get_state()
+        return _render_queue_html([], 0), "⚠️ 请上传图片文件", None, notes, ""
+
+    file_list = [str(Path(f).resolve()) for f in source if f]
     try:
         _backend.add_images(file_list, notes)
     except ValueError as e:
         state = _backend.get_state()
         qhtml = _render_queue_from_state(state)
-        return qhtml, f"⚠️ {e}", None, notes
+        return qhtml, f"⚠️ {e}", None, notes, _render_pending_files_html()
+
+    # Clear pending-files accumulator (files have been consumed into the queue)
+    _pending_files = []
 
     state = _backend.get_state()
     qhtml = _render_queue_from_state(state)
     total = state.get("total", 0)
-    return qhtml, f"✅ 已添加第 {total} 题，共 {total} 题", None, ""
+    return qhtml, f"✅ 已添加第 {total} 题，共 {total} 题", None, "", ""
 
 
 def handle_select_item(idx_str: str = "") -> tuple:
@@ -522,13 +568,35 @@ def handle_clear_queue() -> tuple:
 
 
 def handle_file_change(files: list[str] | None) -> tuple:
-    """Auto-add files when auto_add is enabled."""
-    if not files or not _backend.get_auto_add():
-        # Use gr.skip() to leave UI components unchanged.
-        # Returning None would clear queue_html, which is destructive
-        # when triggered by the cascade: add_images clears file_input
-        # → file_input.change fires again with files=None.
-        return gr.skip(), gr.skip(), gr.skip(), gr.skip()
+    """Accumulate files when auto_add is OFF; auto-add immediately when ON.
+
+    After accumulating, clears file_input (returns None) so the component
+    resets to its "input area" state — Gradio's file-list mode has a tiny
+    drop zone that blocks subsequent drags.
+    """
+    global _pending_files
+    if not files:
+        # Cascade from handle_add_images or our own clear — skip.
+        return gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip()
+    if not _backend.get_auto_add():
+        # Accumulate: merge new files into pending list (dedup by resolved path)
+        resolved_new = [str(Path(f).resolve()) for f in files if f]
+        existing = set(_pending_files)
+        added = 0
+        for f in resolved_new:
+            if f not in existing:
+                _pending_files.append(f)
+                existing.add(f)
+                added += 1
+        state = _backend.get_state()
+        qhtml = _render_queue_from_state(state)
+        count = len(_pending_files)
+        if added > 0:
+            # New files accumulated — clear file_input to reset to input area.
+            # _pending_files holds the data; user clicks "添加" to consume it.
+            return qhtml, f"📷 已选择 {count} 个文件，点击添加或继续拖入", None, gr.skip(), _render_pending_files_html()
+        # No new files (feedback loop from our own clear) — skip to break cycle
+        return qhtml, f"📷 已选择 {count} 个文件（无新增），点击添加或继续拖入", gr.skip(), gr.skip(), gr.skip()
     return handle_add_images(files, "")
 
 
@@ -537,11 +605,15 @@ def handle_clipboard_paste(b64data: str) -> tuple:
 
     Does NOT add to queue — the pasted image appears in the gr.File upload
     component so the user can type notes and manually click "添加到队列".
+
+    Accumulates into _pending_files (shared with drag/select) so paste, drag,
+    and file dialog all append instead of replacing each other.
     """
+    global _pending_files
     print(f"📋 [paste] received data: {len(b64data) if b64data else 0} chars, starts with image: {b64data.startswith('data:image') if b64data else False}", flush=True)
     if not b64data or not b64data.startswith("data:image"):
         state = _backend.get_state()
-        return _render_queue_from_state(state), "⚠️ 粘贴板无图片", gr.skip(), gr.skip()
+        return _render_queue_from_state(state), "⚠️ 粘贴板无图片", gr.skip(), gr.skip(), gr.skip()
 
     try:
         # Decode base64 data URL → temp file
@@ -554,13 +626,33 @@ def handle_clipboard_paste(b64data: str) -> tuple:
     except Exception as e:
         print(f"❌ [paste] decode failed: {e}", flush=True)
         state = _backend.get_state()
-        return _render_queue_from_state(state), f"❌ 粘贴解码失败: {e}", gr.skip(), gr.skip()
+        return _render_queue_from_state(state), f"❌ 粘贴解码失败: {e}", gr.skip(), gr.skip(), gr.skip()
 
-    # Return temp file path → appears in gr.File upload area.
+    # Append to unified pending-files accumulator (shared with drag & file select)
+    _pending_files.append(tmp.name)
+
+    # Clear file_input (None) to keep it in "input area" mode so further
+    # pastes/drags aren't blocked by Gradio's file-list drop zone.
     # gr.skip() for manual_notes preserves any text the user already typed.
     state = _backend.get_state()
     qhtml = _render_queue_from_state(state)
-    return qhtml, "✅ 图片已粘贴到上传区，输入备注后点击添加", [tmp.name], gr.skip()
+    count = len(_pending_files)
+    return qhtml, f"✅ 已粘贴图片（共 {count} 个文件待添加），输入备注后点击添加", None, gr.skip(), _render_pending_files_html()
+
+
+def handle_remove_pending(idx_str: str = "") -> tuple:
+    """Remove a file from the pending list by index (via JS bridge)."""
+    global _pending_files
+    if idx_str:
+        try:
+            idx = int(idx_str)
+            if 0 <= idx < len(_pending_files):
+                removed = _pending_files.pop(idx)
+                print(f"📎 [pending] removed: {Path(removed).name}", flush=True)
+        except (ValueError, IndexError):
+            pass
+    state = _backend.get_state()
+    return _render_pending_files_html(), _render_queue_from_state(state)
 
 
 def handle_download_vault() -> str:
@@ -606,7 +698,6 @@ def create_app() -> gr.Blocks:
                 )
             with gr.Column(scale=2):
                 with gr.Row():
-                    add_btn = gr.Button("➕ 添加到队列", variant="secondary")
                     ocr_all_btn = gr.Button("🔍 全部 OCR", variant="primary")
                     llm_all_btn = gr.Button("🤖 全部整理", variant="primary")
                     download_btn = gr.DownloadButton("📦 下载题库", variant="secondary", size="sm")
@@ -621,14 +712,14 @@ def create_app() -> gr.Blocks:
                 with gr.Row():
                     # ── Left: Queue List ──
                     with gr.Column(scale=1, min_width=220):
-                        gr.Markdown("### 📋 队列")
-                        queue_html = gr.HTML(value="<p style='color:#888;'>请上传截图</p>")
-
-                        # Hidden textbox for JS-driven selection
-                        select_id = gr.Textbox(visible="hidden", elem_id="queue_selector")
-                        # Hidden textbox for JS-driven pagination
-                        page_selector = gr.Textbox(visible="hidden", elem_id="page_selector")
-
+                        file_input = gr.File(
+                            label="📷 上传截图（可多选）",
+                            file_types=["image"],
+                            file_count="multiple",
+                        )
+                        pending_files_html = gr.HTML(value="")
+                        # Hidden textbox for JS-driven pending-file removal
+                        remove_pending = gr.Textbox(visible="hidden", elem_id="remove_pending")
                         manual_notes = gr.Textbox(
                             label="📝 附加信息（添加到每题，含错因分析、题目来源、备注等）",
                             placeholder="例如：我把条件概率和联合概率搞混了 / 此题来自2024真题 / 注意区分拉格朗日和柯西中值定理...",
@@ -636,14 +727,17 @@ def create_app() -> gr.Blocks:
                         )
                         # Hidden textbox for JS-driven clipboard paste (Ctrl+V)
                         paste_input = gr.Textbox(visible="hidden", elem_id="paste_input")
+                        add_btn = gr.Button("➕ 添加到队列", variant="secondary", size="sm")
                         gr.Markdown(
                             "💡 **提示**：截屏后在此页面按 **Ctrl+V** 即可粘贴图片入队",
                         )
-                        file_input = gr.File(
-                            label="📷 上传截图（可多选）",
-                            file_types=["image"],
-                            file_count="multiple",
-                        )
+                        gr.Markdown("### 📋 队列")
+                        queue_html = gr.HTML(value="<p style='color:#888;'>请上传截图</p>")
+
+                        # Hidden textbox for JS-driven selection
+                        select_id = gr.Textbox(visible="hidden", elem_id="queue_selector")
+                        # Hidden textbox for JS-driven pagination
+                        page_selector = gr.Textbox(visible="hidden", elem_id="page_selector")
 
                     # ── Right: Detail Panels ──
                     with gr.Column(scale=3):
@@ -798,7 +892,7 @@ def create_app() -> gr.Blocks:
         add_btn.click(
             fn=handle_add_images,
             inputs=[file_input, manual_notes],
-            outputs=[queue_html, status_line, file_input, manual_notes],
+            outputs=[queue_html, status_line, file_input, manual_notes, pending_files_html],
         ).then(
             fn=handle_select_item,
             outputs=[
@@ -812,7 +906,7 @@ def create_app() -> gr.Blocks:
         file_input.change(
             fn=handle_file_change,
             inputs=[file_input],
-            outputs=[queue_html, status_line, file_input, manual_notes],
+            outputs=[queue_html, status_line, file_input, manual_notes, pending_files_html],
         )
 
         # Clipboard paste: JS bridge via hidden paste_input.
@@ -821,7 +915,7 @@ def create_app() -> gr.Blocks:
         paste_input.change(
             fn=lambda d: handle_clipboard_paste(d or ""),
             inputs=[paste_input],
-            outputs=[queue_html, status_line, file_input, manual_notes],
+            outputs=[queue_html, status_line, file_input, manual_notes, pending_files_html],
         ).then(
             fn=handle_select_item,
             outputs=[
@@ -829,6 +923,13 @@ def create_app() -> gr.Blocks:
                 adj_subject, adj_lecture, adj_qtype, adj_opd_target,
                 key_insight_display, nav_bar, queue_html,
             ],
+        )
+
+        # Remove pending file — JS bridge via hidden remove_pending
+        remove_pending.change(
+            fn=lambda d: handle_remove_pending(d or ""),
+            inputs=[remove_pending],
+            outputs=[pending_files_html, queue_html],
         )
 
         # OCR All

@@ -47,11 +47,11 @@
     },
     "problem": {
       "type": "string",
-      "description": "题目原文，数学公式用LaTeX格式"
+      "description": "题目原文，数学公式仅用 $...$（行内）和 $$...$$（独立行），禁止 \\(...\\) 或 \\[...\\]"
     },
     "answer": {
       "type": "string",
-      "description": "最终答案，数学公式用LaTeX格式"
+      "description": "最终答案，数学公式仅用 $...$（行内）和 $$...$$（独立行），禁止 \\(...\\) 或 \\[...\\]"
     },
     "solution": {
       "type": "object",
@@ -67,7 +67,7 @@
         "steps": {
           "type": "array",
           "items": {"type": "string"},
-          "description": "详细解题步骤，每步一个元素，数学公式用LaTeX"
+          "description": "详细解题步骤，每步一个元素，数学公式仅用 $...$（行内）和 $$...$$（独立行）"
         },
         "error_analysis": {
           "type": "string",

@@ -667,7 +667,9 @@ def _build_system_prompt(knowledge_tree: str, opd_markers: str) -> str:
 ## 输出要求
 
 1. 使用 organize_math_problem 函数输出结构化 JSON
-2. 所有数学公式必须使用 LaTeX 格式
+2. 所有数学公式必须使用 LaTeX 格式，**仅限** $...$（行内公式）和 $$...$$（独立行公式）两种分隔符。
+   禁止使用 \\(...\\)、\\[...\\]、\\begin{{equation}}...\\end{{equation}} 等其他数学环境。
+   示例：行内公式 $x^2 + y^2 = 1$，独立行公式 $$\\lim_{{x \\to 0}} \\frac{{\\sin x}}{{x}} = 1$$
 3. subject 必须从 [高等数学, 线性代数, 概率统计] 中选择
 4. lecture 必须从知识体系中的讲次名称中选择
 5. question_type 必须从 [选择题, 填空题, 解答题] 中选择
