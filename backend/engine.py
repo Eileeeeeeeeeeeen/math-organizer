@@ -378,52 +378,57 @@ class Backend:
             return {"status": "error", "msg": str(e)}
 
     def delete_from_vault(self, idx: int) -> dict:
-        """Delete an archived/reviewable item from the vault.
+        """Delete an item — from filesystem if archived, then pop from queue.
 
-        Only items with ARCHIVED or WAITING_REVIEW status can be deleted.
-        The .md file, referenced images, and _index.md link are removed.
-        Queue item is marked DELETED.
+        For archived items: the .md file, referenced images, and _index.md
+        link are removed from the filesystem first.
+        The item is always popped from the queue list (not just marked).
         """
         with self._lock:
             if idx < 0 or idx >= len(self._queue):
                 return {"status": "error", "msg": f"Item {idx} out of range"}
             item = self._queue[idx]
-
-            if item.status not in (QueueStatus.ARCHIVED, QueueStatus.WAITING_REVIEW):
-                return {"status": "error",
-                        "msg": f"只能删除已归档或待审核的题目 (当前: {item.status.value})"}
-
-            if item.record is None:
-                return {"status": "error", "msg": "Item has no record to delete"}
-
+            needs_fs_delete = (
+                item.status in (QueueStatus.ARCHIVED, QueueStatus.WAITING_REVIEW)
+                and item.record is not None
+                and bool(item.filename)
+            )
             filename = item.filename
             record = item.record
 
-        if not filename:
-            return {"status": "error", "msg": "Item has no filename — not yet archived"}
+        # ── Filesystem cleanup (outside lock) ──
+        fs_msg = ""
+        if needs_fs_delete:
+            try:
+                del_result = self._archive_engine.delete_problem(record, filename)
+                fs_msg = "; ".join(del_result.get("errors", [])
+                                   + del_result.get("warnings", []))
+            except Exception as e:
+                print(f"❌ Delete failed (item #{idx}): {e}", flush=True)
+                with self._lock:
+                    self._nav_next_waiting()
+                return {"status": "error", "msg": str(e)}
 
-        # Delete from filesystem via ArchiveEngine
-        try:
-            del_result = self._archive_engine.delete_problem(record, filename)
-            with self._lock:
-                if del_result["success"]:
-                    self._queue[idx].status = QueueStatus.DELETED
-                else:
-                    # Leave current status, report errors
-                    pass
-                self._nav_next_waiting()
-            return {
-                "status": "ok" if del_result["success"] else "error",
-                "msg": "; ".join(del_result.get("errors", [])
-                                + del_result.get("warnings", [])),
-                "deleted_md": del_result.get("deleted_md", ""),
-                "deleted_images": del_result.get("deleted_images", []),
-            }
-        except Exception as e:
-            print(f"❌ Delete failed (item #{idx}): {e}", flush=True)
-            with self._lock:
-                self._nav_next_waiting()
-            return {"status": "error", "msg": str(e)}
+        # ── Pop from queue + reindex ──
+        with self._lock:
+            if idx >= len(self._queue):
+                return {"status": "error", "msg": "Item already removed"}
+            self._queue.pop(idx)
+            # Reindex remaining items so .id matches position
+            for i in range(idx, len(self._queue)):
+                self._queue[i].id = i
+            # Adjust selected index
+            if len(self._queue) == 0:
+                self._selected_idx = 0
+            elif self._selected_idx > idx:
+                self._selected_idx -= 1
+            elif self._selected_idx >= len(self._queue):
+                self._selected_idx = max(0, len(self._queue) - 1)
+
+        return {
+            "status": "ok",
+            "msg": ("已删除" if not fs_msg else f"已删除 ({fs_msg})"),
+        }
 
     # ── Navigation ─────────────────────────────────────────────────────────
 

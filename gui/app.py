@@ -533,9 +533,10 @@ def handle_file_change(files: list[str] | None) -> tuple:
 
 
 def handle_clipboard_paste(b64data: str) -> tuple:
-    """Decode base64 clipboard image, save as temp file, add to queue.
+    """Decode base64 clipboard image, save as temp file, display in upload area.
 
-    Triggered by both Ctrl+V (paste event) and the 📋 paste button.
+    Does NOT add to queue — the pasted image appears in the gr.File upload
+    component so the user can type notes and manually click "添加到队列".
     """
     print(f"📋 [paste] received data: {len(b64data) if b64data else 0} chars, starts with image: {b64data.startswith('data:image') if b64data else False}", flush=True)
     if not b64data or not b64data.startswith("data:image"):
@@ -555,7 +556,11 @@ def handle_clipboard_paste(b64data: str) -> tuple:
         state = _backend.get_state()
         return _render_queue_from_state(state), f"❌ 粘贴解码失败: {e}", gr.skip(), gr.skip()
 
-    return handle_add_images([tmp.name], "")
+    # Return temp file path → appears in gr.File upload area.
+    # gr.skip() for manual_notes preserves any text the user already typed.
+    state = _backend.get_state()
+    qhtml = _render_queue_from_state(state)
+    return qhtml, "✅ 图片已粘贴到上传区，输入备注后点击添加", [tmp.name], gr.skip()
 
 
 def handle_download_vault() -> str:
@@ -666,6 +671,13 @@ def create_app() -> gr.Blocks:
                             json_display = gr.JSON(label="结构化 JSON")
                             key_insight_display = gr.Markdown("")
 
+                            # Review Actions — above text fields for easy access
+                            with gr.Row():
+                                accept_btn = gr.Button("✅ 通过（归档）", variant="primary", scale=2)
+                                skip_btn = gr.Button("⏭️ 跳过", variant="secondary", scale=1)
+                                reprocess_btn = gr.Button("🔄 重做", variant="stop", scale=1)
+                                delete_btn = gr.Button("🗑️ 删除", variant="stop", scale=1)
+
                             with gr.Row():
                                 adj_subject = gr.Dropdown(
                                     label="科目", choices=["高等数学", "线性代数", "概率统计"],
@@ -692,13 +704,6 @@ def create_app() -> gr.Blocks:
                                     {"left": "$$", "right": "$$", "display": True},
                                 ],
                             )
-
-                        # Review Actions
-                        with gr.Row():
-                            accept_btn = gr.Button("✅ 通过（归档）", variant="primary", scale=2)
-                            skip_btn = gr.Button("⏭️ 跳过", variant="secondary", scale=1)
-                            reprocess_btn = gr.Button("🔄 重做", variant="stop", scale=1)
-                            delete_btn = gr.Button("🗑️ 删除", variant="stop", scale=1)
 
                         review_status = gr.Markdown("")
 
@@ -810,7 +815,9 @@ def create_app() -> gr.Blocks:
             outputs=[queue_html, status_line, file_input, manual_notes],
         )
 
-        # Clipboard paste: JS bridge via hidden paste_input
+        # Clipboard paste: JS bridge via hidden paste_input.
+        # Pasted image appears in file_input upload area; user types notes
+        # then clicks "➕ 添加到队列" — no auto-add to queue.
         paste_input.change(
             fn=lambda d: handle_clipboard_paste(d or ""),
             inputs=[paste_input],
